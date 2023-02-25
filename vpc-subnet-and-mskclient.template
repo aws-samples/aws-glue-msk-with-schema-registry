@@ -1,0 +1,577 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+ 
+AWSTemplateFormatVersion: 2010-09-09
+Description:  This template deploys a VPC, with a pair of public and private subnets spread
+  across two Availability Zones. It deploys an internet gateway, with a default
+  route on the public subnets, interface endpoint for kms, cloudwatch and secretManager, EC2 Instance, IAM role for instance, Instance profile, Security Group and SecretManager.
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.192.0.0/16
+
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.192.10.0/24
+
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.192.11.0/24
+
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.192.20.0/24
+
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.192.21.0/24
+  KeyName:
+    Description: Key pair name used for login into EC2 instance.
+    Type: AWS::EC2::KeyPair::KeyName
+  SshAllowedCidr:
+    Description: "Cidr block for allowing ssh connection to instance. Check your public Ip using http://checkip.amazonaws.com/ and add /32 at the end of ip address"
+    Type: String
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t2.nano, t2.micro, t2.small, t2.medium, t2.large, t2.xlarge, t2.2xlarge,
+      t3.nano, t3.micro, t3.small, t3.medium, t3.large, t3.xlarge, t3.2xlarge,
+      m4.large, m4.xlarge, m4.2xlarge, m4.4xlarge, m4.10xlarge,
+      m5.large, m5.xlarge, m5.2xlarge, m5.4xlarge,
+      c5.large, c5.xlarge, c5.2xlarge, c5.4xlarge, c5.9xlarge,
+      g3.8xlarge,
+      r5.large, r5.xlarge, r5.2xlarge, r5.4xlarge, r3.12xlarge,
+      i3.xlarge, i3.2xlarge, i3.4xlarge, i3.8xlarge,
+      d2.xlarge, d2.2xlarge, d2.4xlarge, d2.8xlarge]
+    ConstraintDescription: must be a valid EC2 instance type.
+
+Mappings:
+  RegionAMI:
+    us-east-1:
+        AMI: "ami-0b5eea76982371e91"
+    us-east-2:
+        AMI: "ami-0a606d8395a538502"
+    us-west-1:
+        AMI: "ami-00d8a762cb0c50254"
+    us-west-2:
+        AMI: "ami-0ceecbb0f30a902a6"
+    ap-southeast-2:
+        AMI: "ami-051a81c2bd3e755db"
+    eu-central-1:
+        AMI: "ami-0a261c0e5f51090b1"
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Routes (AZ1)
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet2
+
+  S3VpcEndoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      VpcId: !Ref VPC
+      RouteTableIds:
+      - !Ref PublicRouteTable
+      - !Ref PrivateRouteTable1
+  CloudWatchLogsVpcEndoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+      PrivateDnsEnabled: true
+      SubnetIds:
+      - !Ref PrivateSubnet1
+      - !Ref PrivateSubnet2
+      SecurityGroupIds:
+      - !Ref SecurityGroup
+     
+  CloudWatchMonitoringVpcEndoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.monitoring"
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+      PrivateDnsEnabled: true
+      SubnetIds:
+      - !Ref PrivateSubnet1
+      - !Ref PrivateSubnet2
+      SecurityGroupIds:
+      - !Ref SecurityGroup
+  SecretManagerVpcEndoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.secretsmanager"
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+      PrivateDnsEnabled: true
+      SubnetIds:
+      - !Ref PrivateSubnet1
+      - !Ref PrivateSubnet2
+      SecurityGroupIds:
+      - !Ref SecurityGroup
+  KmsVpcEndoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.kms"
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+      PrivateDnsEnabled: true
+      SubnetIds:
+      - !Ref PrivateSubnet1
+      - !Ref PrivateSubnet2
+      SecurityGroupIds:
+      - !Ref SecurityGroup
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "glue-connection-security-group"
+      GroupDescription: "Security group with a self-referencing inbound rule."
+      VpcId: !Ref VPC
+
+  SecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref SecurityGroup
+      IpProtocol: "-1"
+      SourceSecurityGroupId: !Ref SecurityGroup
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub 'aws-glue-gluemsk-${AWS::AccountId}-${AWS::Region}'
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  S3BucketForJobOutput:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub 'aws-glue-gluemsk-output-${AWS::AccountId}-${AWS::Region}'
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  S3CleanupFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "glue-msk-secleanup-role-${EnvironmentName}"
+      ManagedPolicyArns:
+        -  "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: '/service-role/'
+      Policies:
+      - PolicyName: !Sub "cfn-msk-msk-s3cleanup-${EnvironmentName}"
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - iam:ListAttachedRolePolicies
+              - iam:DetachRolePolicy
+            Resource:
+              - !GetAtt EC2Role.Arn 
+          - Effect: Allow
+            Action:
+              - s3:Get*
+              - s3:Delete*
+              - s3:List*
+            Resource: 
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref S3BucketForJobOutput
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref S3BucketForJobOutput
+                  - /*
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref S3Bucket
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref S3Bucket
+                  - /*
+      Tags: 
+        - Key: AppName
+          Value: !Sub '${EnvironmentName}-${AWS::StackName}'
+  
+  CleanupResourcesOnDeletion:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import logging
+          import cfnresponse
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          def lambda_handler(event, context):
+            logger.info(event)
+            responseStatus = cfnresponse.SUCCESS
+            responseData = {}
+            iam_role = event['ResourceProperties'].get('IamRole')
+            bucket = event['ResourceProperties'].get('BucketName')
+            if bucket and event['RequestType'] == 'Delete':
+              try:
+                  s3 = boto3.resource('s3')
+                  bucket = s3.Bucket(bucket)
+                  for obj in bucket.objects.filter():
+                      s3.Object(bucket.name, obj.key).delete()
+                  responseStatus = cfnresponse.SUCCESS
+              except Exception as e:
+                  logger.exception(e)
+                  responseStatus = cfnresponse.FAILED
+            if iam_role and event['RequestType'] == 'Delete':
+              try:
+                iam = boto3.client('iam')
+                attached_policies = iam.list_attached_role_policies(RoleName=iam_role)
+                for policy in attached_policies['AttachedPolicies']:
+                  iam.detach_role_policy(RoleName=iam_role, PolicyArn=policy['PolicyArn'])
+                responseStatus = cfnresponse.SUCCESS
+              except Exception as e:
+                logger.exception(e)
+                responseStatus = cfnresponse.FAILED
+            cfnresponse.send(event, context, responseStatus, responseData)
+            return
+      FunctionName: !Sub "cfn-delete-resources-${EnvironmentName}"
+      Handler: index.lambda_handler
+      Role: !GetAtt S3CleanupFunctionExecutionRole.Arn
+      Runtime: python3.7
+      Timeout: 30
+
+  CleanupS3OutputBucketOnDelete:
+    Type: Custom::cleanups3bucket
+    Properties:
+      ServiceToken: !GetAtt CleanupResourcesOnDeletion.Arn 
+      BucketName: !Ref S3Bucket
+
+  CleanupS3BucketOnDelete:
+    Type: Custom::cleanups3bucket
+    Properties:
+      ServiceToken: !GetAtt CleanupResourcesOnDeletion.Arn 
+      BucketName: !Ref S3BucketForJobOutput
+  
+  DeattachIamPolicy:
+    Type: Custom::deatchpolicy
+    Properties:
+      ServiceToken: !GetAtt CleanupResourcesOnDeletion.Arn 
+      IamRole: !Ref EC2Role
+  KMSKey:
+    Type: 'AWS::KMS::Key'
+    Properties:
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+          Action: 'kms:*'
+          Resource: '*'
+        - Effect: Allow
+          Principal:
+            AWS: '*'
+          Action:
+          - 'kms:Encrypt'
+          - 'kms:Decrypt'
+          - 'kms:ReEncrypt*'
+          - 'kms:GenerateDataKey*'
+          - 'kms:CreateGrant'
+          - 'kms:ListGrants'
+          - 'kms:DescribeKey'
+          Resource: '*'
+          Condition:
+            StringEquals:
+              'kms:CallerAccount': !Ref 'AWS::AccountId'
+  KeyAlias:
+    Type: 'AWS::KMS::Alias'
+    Properties:
+      AliasName: !Sub 'alias/${AWS::StackName}'
+      TargetKeyId: !Ref KMSKey
+
+  MySecretA:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: !Sub 'AmazonMSK_${AWS::StackName}'
+      Description: "This secret has a dynamically generated secret password."
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "test-user"}'
+        GenerateStringKey: "password"
+        PasswordLength: 10
+        ExcludeCharacters: '"/\'
+      KmsKeyId: !GetAtt KMSKey.Arn
+      Tags:
+        -
+          Key: AppName
+          Value: !Ref AWS::StackName
+  MSKClientMachineSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group attached to attach mks client machine"
+      GroupName: "msk-client-machine"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Ref SshAllowedCidr
+        Description: "allow ssh connection"
+      Tags:
+          -
+            Key: AppName
+            Value: !Ref AWS::StackName 
+  EC2Role: 
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "EC2-Instance-Role-${EnvironmentName}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: '/'
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AWSGlueSchemaRegistryReadonlyAccess"
+      Policies:
+      - PolicyName: !Sub "ec2-secretm-access-policy-${EnvironmentName}"
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+            Resource: !Ref MySecretA
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:*Object
+            Resource:
+              - !GetAtt S3Bucket.Arn
+              - !Join ["/", [!GetAtt S3Bucket.Arn, "*"]]
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      InstanceProfileName: !Sub "EC2InstanceProfile-${EnvironmentName}"
+      Roles: 
+        - 
+          !Ref EC2Role
+  KafkaClientEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: 
+        !Ref KeyName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SubnetId: !Ref PublicSubnet1
+      ImageId: 
+        Fn::FindInMap:
+          - "RegionAMI"
+          - Ref: "AWS::Region"
+          - "AMI"
+      SecurityGroupIds: 
+       - !Ref MSKClientMachineSG
+       - !Ref SecurityGroup
+      Tags:
+        -
+          Key: AppName
+          Value: !Ref AWS::StackName
+      UserData:
+        Fn::Base64: !Sub |
+            #!/bin/bash
+            yum install java-1.8.0-devel -y
+            /usr/sbin/alternatives --config java
+            /usr/sbin/alternatives --config javac
+            wget https://dlcdn.apache.org/maven/maven-3/3.8.7/binaries/apache-maven-3.8.7-bin.tar.gz -O apache-maven-3.8.7-bin.tar.gz
+            tar -xzvf apache-maven-3.8.7-bin.tar.gz -C /opt/
+            wget https://archive.apache.org/dist/kafka/2.8.1/kafka_2.12-2.8.1.tgz -O kafka_2.12-2.8.1.tgz
+            tar -xzvf kafka_2.12-2.8.1.tgz -C /opt/
+            echo "export PATH=$PATH:/opt/apache-maven-3.8.7/bin/:/opt/kafka_2.12-2.8.1/bin/" >> /etc/bashrc
+            source /etc/bashrc
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+
+  PublicSubnet1:
+    Description: A reference to the public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+
+  PublicSubnet2:
+    Description: A reference to the public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+
+  PrivateSubnet1:
+    Description: A reference to the private subnet in the 1st Availability Zone
+    Value: !Ref PrivateSubnet1
+
+  PrivateSubnet2:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet2
+
+  SecurityGroup:
+    Description: Security group with self-referencing inbound rule
+    Value: !Ref SecurityGroup
+  BucketNameForScript:
+    Value: !Ref S3Bucket
+    Description: Name of the sample Amazon S3 bucket for Glue job.
+  SecretArn:
+    Description: Secret arn for MSK authentication
+    Value: !Ref MySecretA
+  KMSKeyId:
+    Description: KMS key arn for MSK secret encryption
+    Value: !Ref KMSKey
+  InstanceId:
+    Description: InstanceId of the newly created EC2 instance
+    Value: !Ref 'KafkaClientEC2Instance'
+  PublicDNS:
+    Description: Public DNSName of the newly created EC2 instance
+    Value: !GetAtt [KafkaClientEC2Instance, PublicDnsName]
+  SecurityGroupIdForGlueConnection:
+    Value: !Ref SecurityGroup
+    Description: Security group id for Glue connection.
+  S3BucketForOutput:
+    Value: !Ref S3BucketForJobOutput
+    Description: S3 bucket name for Glue job output

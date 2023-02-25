@@ -1,0 +1,32 @@
+{
+  "type": "record",
+  "namespace": "ABC_Organization",
+  "name": "Employee",
+  "fields": [
+    {
+      "name": "Name",
+      "type": "string"
+    },
+    {
+      "name": "Age",
+      "type": "int"
+    },
+    {
+      "name": "address",
+      "type": {
+        "type": "record",
+        "name": "addressRecord",
+        "fields": [
+          {
+            "name": "street",
+            "type": "string"
+          },
+          {
+            "name": "zipcode",
+            "type": "int"
+          }
+        ]
+      }
+    }
+  ]
+}
