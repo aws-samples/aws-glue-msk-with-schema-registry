@@ -71,7 +71,7 @@ CloudFormation template 'vpc-subnet-and-mskclient.template' will create a VPC wi
 4. Start the job to process the data published into MSK topic
  
 5. Check the processed data into S3 bucket under `<bucket-name>/output` prefix, and run the crawler.
-6. Run the Athena query against the table created by Cralwer. 
+6. Run the Athena query against the table created by Crawler.
 
 # Security
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
