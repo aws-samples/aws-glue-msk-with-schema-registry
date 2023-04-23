@@ -33,13 +33,13 @@ CloudFormation template 'vpc-subnet-and-mskclient.template' will create a VPC wi
 ## Getting started
 ### Launch vpc_subnet_and_mskclient Stack. 
 1. Clone the repo
-  ```
+  ```bash
   git clone https://github.com/aws-samples/aws-glue-msk-with-schema-registry.git
   cd aws-glue-msk-with-schema-registry
   ```
 2. Launch the cloudformation template `vpc-subnet-and-mskclient.template`. Pass values for parameters. 
 3. Once stack creation is completed, get the bucket name from stack *output* section, and copy the Glue Script to S3 bucket  
-  ```
+  ```bash
   aws s3 cp glue_job_script/mskprocessing.py s3://<bucket-name>/
   ``` 
 ### Launch Amazon MSK and Glue Stack. 
@@ -49,16 +49,33 @@ CloudFormation template 'vpc-subnet-and-mskclient.template' will create a VPC wi
 1. Get the public dns name for EC2 instance from  `output` section of stack `vpc-subnet-and-mskclient` created in step 2, and [SSH into your instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AccessingInstancesLinux.html)
 
 2. Clone the repository, build the producer application and run it as below.
-  ```
-  git clone https://github.com/aws-samples/aws-glue-msk-with-schema-registry.git
-  cd aws-glue-msk-with-schema-registry/amazon_msk_producer
-  mvn clean package 
-  java -jar target/amazon_msk_producer-1.0-SNAPSHOT-jar-with-dependencies.jar -brokers 'brokers' -secretArn 'secretArn' -region region-name -topic 'topic-name' -numRecords 10
-  ```
-   
-  #### Argument Supported for Producer Application.
+
+```bash
+  cd amazon_msk_producer
+  mvn clean package
+  BROKERS={OUTPUT_VAL_OF_MSKBootstrapServers – Ref. Step 5}
+  REGISTRY_NAME={VAL_OF_GlueSchemaRegistryName - remember to enter the name and not the ARN – Ref. Step 5}
+  SCHEMA_NAME={Extract name from SchemaARN - remember to enter the name and not the ARN – Ref. Step 5}
+  TOPIC_NAME="test"
+  java -jar target/amazon_msk_producer-1.0-SNAPSHOT-jar-with-dependencies.jar -brokers $BROKERS -secretArn $SECRET_ARN -region us-east-1 -registryName $REGISTRY_NAME -schema $SCHEMA_NAME -topic $TOPIC_NAME -numRecords 10
+```
+
+**Argument Supported for Producer Application.**
+
   | Parameter | Description | Default Value |
   | :----------: | :-------------: | :---------------: |
+  | `region` | Region name where the Schema registry exist | `""` |
+  | `brokers` | Amazon MSK Brokers | `""` |
+  | `registryName` | Amazon Glue Schema Registry Name | `test-schema-registry` |
+  | `schema` | Schema that is register with Schema registry and will be used in Producer application  | `test_payload_schema` |
+  | `secretArn` | SecretManager Arn for autheticating with Amazon MSK using SASL/SCRAM  | `""` |
+  | `topic` | Topic Name for publishing the data into Amazon MSK | `test` |
+  | `numRecords` | Number of records you want to publish into Amazon MSK Topic | `10` |
+
+1. Once message get published into MSK topic. Get the Glue Straming job name, Crawler name, output S3 bucket from stack `amazon-msk-and-glue` *output*.
+2. Start the job to process the data published into MSK topic
+3. Check the processed data into S3 bucket under `<bucket-name>/output` prefix, and run the crawler.
+4. Run the Athena query against the table created by Crawler.
   | region | Region name where the Schema registry exist | "" |
   | brokers | Amazon MSK Brokers | "" |
   | registryName | Amazon Glue Schema Registry Name | test-schema-registry |
