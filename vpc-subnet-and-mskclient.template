@@ -407,21 +407,6 @@ Resources:
             AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
           Action: 'kms:*'
           Resource: '*'
-        - Effect: Allow
-          Principal:
-            AWS: '*'
-          Action:
-          - 'kms:Encrypt'
-          - 'kms:Decrypt'
-          - 'kms:ReEncrypt*'
-          - 'kms:GenerateDataKey*'
-          - 'kms:CreateGrant'
-          - 'kms:ListGrants'
-          - 'kms:DescribeKey'
-          Resource: '*'
-          Condition:
-            StringEquals:
-              'kms:CallerAccount': !Ref 'AWS::AccountId'
   KeyAlias:
     Type: 'AWS::KMS::Alias'
     Properties:
