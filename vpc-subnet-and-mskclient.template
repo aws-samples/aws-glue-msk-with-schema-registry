@@ -255,9 +255,17 @@ Resources:
   SecurityGroupIngress:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
+      Description: Self referencing rule
       GroupId: !Ref SecurityGroup
       IpProtocol: "-1"
       SourceSecurityGroupId: !Ref SecurityGroup
+  SecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Allow all outbound traffic
+      GroupId: !Ref SecurityGroup
+      IpProtocol: "-1"
+      CidrIp: 0.0.0.0/0
   S3Bucket:
     Type: 'AWS::S3::Bucket'
     Properties:
@@ -399,6 +407,7 @@ Resources:
   KMSKey:
     Type: 'AWS::KMS::Key'
     Properties:
+      EnableKeyRotation: true
       KeyPolicy:
         Version: '2012-10-17'
         Statement:
@@ -439,7 +448,11 @@ Resources:
         FromPort: 22
         ToPort: 22
         CidrIp: !Ref SshAllowedCidr
-        Description: "allow ssh connection"
+        Description: "Allow SSH connection"
+      SecurityGroupEgress:
+      - Description: Allow all outbound traffic
+        IpProtocol: "-1"
+        CidrIp: 0.0.0.0/0
       Tags:
           -
             Key: AppName

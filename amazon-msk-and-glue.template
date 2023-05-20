@@ -124,6 +124,10 @@ Resources:
         ToPort: 2181
         SourceSecurityGroupId: !Ref SecurityGroupForGlueConnection
         Description: "communicate with Apache ZooKeeper by using default port"
+      SecurityGroupEgress:
+      - Description: Allow all outbound traffic
+        IpProtocol: "-1"
+        CidrIp: 0.0.0.0/0
       Tags:
           -
             Key: AppName
@@ -388,7 +392,7 @@ Resources:
       Description: "Glue straming job for processing MSK topic"
       ExecutionProperty:
         MaxConcurrentRuns: 1
-      GlueVersion: "3.0"
+      GlueVersion: "4.0"
       WorkerType: !Ref GlueWorkerType
       NumberOfWorkers: !Ref NumberOfWorkers
       DefaultArguments:
