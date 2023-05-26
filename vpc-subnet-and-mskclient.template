@@ -416,6 +416,20 @@ Resources:
             AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
           Action: 'kms:*'
           Resource: '*'
+        - Effect: Allow
+          Principal:
+            AWS: '*'
+          Action: 
+          - kms:Decrypt
+          - kms:ReEncrypt*
+          - kms:GenerateDataKey*
+          - kms:CreateGrant
+          - kms:DescribeKey
+          Resource: '*'
+          Condition: 
+            StringEquals:
+              kms:CallerAccount: !Ref AWS::AccountId
+              kms:ViaService: !Sub 'secretsmanager.${AWS::Region}.amazonaws.com'
   KeyAlias:
     Type: 'AWS::KMS::Alias'
     Properties:
@@ -522,12 +536,9 @@ Resources:
             yum install java-1.8.0-devel -y
             /usr/sbin/alternatives --config java
             /usr/sbin/alternatives --config javac
-            wget https://dlcdn.apache.org/maven/maven-3/3.8.7/binaries/apache-maven-3.8.7-bin.tar.gz -O apache-maven-3.8.7-bin.tar.gz
-            tar -xzvf apache-maven-3.8.7-bin.tar.gz -C /opt/
-            wget https://archive.apache.org/dist/kafka/2.8.1/kafka_2.12-2.8.1.tgz -O kafka_2.12-2.8.1.tgz
-            tar -xzvf kafka_2.12-2.8.1.tgz -C /opt/
-            echo "export PATH=$PATH:/opt/apache-maven-3.8.7/bin/:/opt/kafka_2.12-2.8.1/bin/" >> /etc/bashrc
-            source /etc/bashrc
+            wget https://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo -O /etc/yum.repos.d/epel-apache-maven.repo
+            sed -i s/\$releasever/6/g /etc/yum.repos.d/epel-apache-maven.repo
+            yum install -y apache-maven
 Outputs:
   VPC:
     Description: A reference to the created VPC

@@ -429,10 +429,10 @@ Outputs:
     Value: !Ref GlueTable
   GlueSchemaRegistryName:
      Description: Glue schema registry name
-     Value: !Ref GlueSchemaRegistry
-  SchemaArn: 
+     Value: !Ref SchemaRegistryName
+  SchemaName: 
     Description: "Schema registered on Schema registry. Schema definision is created per AWS Public documentation https://docs.aws.amazon.com/glue/latest/dg/schema-registry.html#schema-registry-schemas"
-    Value: !Ref MSKPayloadSchema
+    Value: !Ref MSKSchemaName
   OutputBucketName:
     Value: !Ref S3BucketForOutput
     Description: Name of the Amazon S3 bucket used to write Glue Streaming job output.
