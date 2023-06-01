@@ -53,11 +53,11 @@ CloudFormation template 'vpc-subnet-and-mskclient.template' will create a VPC wi
 ```bash
   cd amazon_msk_producer
   mvn clean package
-  BROKERS={OUTPUT_VAL_OF_MSKBootstrapServers – Ref. Step 5 of the blog post}
-  REGISTRY_NAME={VAL_OF_GlueSchemaRegistryName - remember to enter the name and not the ARN – Ref. Step 5 of the blog post}
-  SCHEMA_NAME={OUTPUT_VAL_OF_SchemaName - Ref. Step 5 of the blog post}
+  BROKERS={OUTPUT_VAL_OF_MSKBootstrapServers – Ref. Step 6 of the blog post}
+  REGISTRY_NAME={VAL_OF_GlueSchemaRegistryName - Ref. Step 6 of the blog post}
+  SCHEMA_NAME={OUTPUT_VAL_OF_SchemaName - Ref. Step 6 of the blog post}
   TOPIC_NAME="test"
-  SECRET_ARN={OUTPUT_VAL_OF_SecretArn – Ref. Step 2 of the blog post}
+  SECRET_ARN={OUTPUT_VAL_OF_SecretArn – Ref. Step 3 of the blog post}
   java -jar target/amazon_msk_producer-1.0-SNAPSHOT-jar-with-dependencies.jar -brokers $BROKERS -secretArn $SECRET_ARN -region us-east-1 -registryName $REGISTRY_NAME -schema $SCHEMA_NAME -topic $TOPIC_NAME -numRecords 10
 ```
 
