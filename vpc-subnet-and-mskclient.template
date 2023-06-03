@@ -384,7 +384,7 @@ Resources:
       FunctionName: !Sub "cfn-delete-resources-${EnvironmentName}"
       Handler: index.lambda_handler
       Role: !GetAtt S3CleanupFunctionExecutionRole.Arn
-      Runtime: python3.7
+      Runtime: python3.10
       Timeout: 30
 
   CleanupS3OutputBucketOnDelete:
